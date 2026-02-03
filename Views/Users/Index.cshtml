@@ -1,0 +1,281 @@
+@model List<User>
+@{
+    ViewData["Title"] = "User Management";
+}
+
+<h4 class="mb-4">
+    <i class="bi bi-people me-2"></i>User Management
+</h4>
+
+<!-- IMPORTANT: Toolbar with action buttons -->
+<!-- NOTE: Toolbar is always visible, buttons disabled when no selection -->
+<div class="btn-toolbar mb-3" role="toolbar" aria-label="User actions toolbar">
+    <button type="button" class="btn btn-warning me-2" id="blockBtn" 
+            title="Block selected users" data-bs-toggle="tooltip">
+        <i class="bi bi-lock-fill me-1"></i>Block
+    </button>
+    <button type="button" class="btn btn-outline-success me-2" id="unblockBtn" 
+            title="Unblock selected users" data-bs-toggle="tooltip">
+        <i class="bi bi-unlock-fill"></i>
+    </button>
+    <button type="button" class="btn btn-outline-danger me-2" id="deleteBtn" 
+            title="Delete selected users" data-bs-toggle="tooltip">
+        <i class="bi bi-trash-fill"></i>
+    </button>
+    <button type="button" class="btn btn-outline-danger" id="deleteUnverifiedBtn" 
+            title="Delete unverified users" data-bs-toggle="tooltip">
+        <i class="bi bi-eraser-fill"></i>
+    </button>
+</div>
+
+<!-- IMPORTANT: Hidden forms for each action -->
+<form id="blockForm" asp-action="Block" method="post" style="display:none;">
+    @Html.AntiForgeryToken()
+</form>
+<form id="unblockForm" asp-action="Unblock" method="post" style="display:none;">
+    @Html.AntiForgeryToken()
+</form>
+<form id="deleteForm" asp-action="Delete" method="post" style="display:none;">
+    @Html.AntiForgeryToken()
+</form>
+<form id="deleteUnverifiedForm" asp-action="DeleteUnverified" method="post" style="display:none;">
+    @Html.AntiForgeryToken()
+</form>
+
+<!-- NOTA BENE: User table with checkboxes for selection -->
+<div class="table-responsive">
+    <table class="table table-bordered table-hover align-middle">
+        <thead class="table-light">
+            <tr>
+                <!-- NOTE: Select all checkbox in header -->
+                <th style="width: 40px;" class="text-center">
+                    <input type="checkbox" id="selectAll" class="form-check-input" 
+                           title="Select all users" data-bs-toggle="tooltip" />
+                </th>
+                <th>
+                    <a href="?sortBy=Name&sortOrder=@(ViewBag.SortBy == "Name" && ViewBag.SortOrder == "asc" ? "desc" : "asc")" 
+                       class="text-decoration-none text-dark">
+                        Name
+                        @if (ViewBag.SortBy == "Name")
+                        {
+                            <i class="bi bi-arrow-@(ViewBag.SortOrder == "asc" ? "up" : "down")"></i>
+                        }
+                    </a>
+                </th>
+                <th>
+                    <a href="?sortBy=Email&sortOrder=@(ViewBag.SortBy == "Email" && ViewBag.SortOrder == "asc" ? "desc" : "asc")" 
+                       class="text-decoration-none text-dark">
+                        Email
+                        @if (ViewBag.SortBy == "Email")
+                        {
+                            <i class="bi bi-arrow-@(ViewBag.SortOrder == "asc" ? "up" : "down")"></i>
+                        }
+                    </a>
+                </th>
+                <th>
+                    <a href="?sortBy=Status&sortOrder=@(ViewBag.SortBy == "Status" && ViewBag.SortOrder == "asc" ? "desc" : "asc")" 
+                       class="text-decoration-none text-dark">
+                        Status
+                        @if (ViewBag.SortBy == "Status")
+                        {
+                            <i class="bi bi-arrow-@(ViewBag.SortOrder == "asc" ? "up" : "down")"></i>
+                        }
+                    </a>
+                </th>
+                <th>
+                    <a href="?sortBy=LastSeen&sortOrder=@(ViewBag.SortBy == "LastSeen" && ViewBag.SortOrder == "asc" ? "desc" : "asc")" 
+                       class="text-decoration-none text-dark">
+                        Last seen
+                        @if (ViewBag.SortBy == "LastSeen" || ViewBag.SortBy == null)
+                        {
+                            <i class="bi bi-arrow-@((ViewBag.SortOrder == "asc" || ViewBag.SortOrder == null) ? "down" : "up")"></i>
+                        }
+                    </a>
+                </th>
+            </tr>
+        </thead>
+        <tbody>
+            @if (Model.Count == 0)
+            {
+                <tr>
+                    <td colspan="5" class="text-center text-muted py-4">
+                        <i class="bi bi-inbox me-2"></i>No users found
+                    </td>
+                </tr>
+            }
+            else
+            {
+                @foreach (var user in Model)
+                {
+                    // IMPORTANT: Check if user is blocked for styling
+                    var isBlocked = user.Status == UserStatus.Blocked;
+                    var rowClass = isBlocked ? "text-muted" : "";
+                    var textDecoration = isBlocked ? "text-decoration-line-through" : "";
+                    
+                    <tr class="@rowClass">
+                        <td class="text-center">
+                            <input type="checkbox" class="form-check-input user-checkbox" 
+                                   value="@user.Id" />
+                        </td>
+                        <td class="@textDecoration">@user.Name</td>
+                        <td>@user.Email</td>
+                        <td>
+                            @{
+                                var badgeClass = user.Status switch
+                                {
+                                    UserStatus.Active => "bg-success",
+                                    UserStatus.Blocked => "bg-danger",
+                                    _ => "bg-secondary"
+                                };
+                            }
+                            <span class="badge @badgeClass">@user.Status</span>
+                        </td>
+                        <td>
+                            @if (user.LastLoginTime.HasValue)
+                            {
+                                var timeAgo = DateTime.UtcNow - user.LastLoginTime.Value;
+                                var timeAgoText = timeAgo.TotalMinutes < 1 ? "less than a minute ago" :
+                                                  timeAgo.TotalHours < 1 ? $"{(int)timeAgo.TotalMinutes} minute(s) ago" :
+                                                  timeAgo.TotalDays < 1 ? $"{(int)timeAgo.TotalHours} hour(s) ago" :
+                                                  timeAgo.TotalDays < 7 ? $"{(int)timeAgo.TotalDays} day(s) ago" :
+                                                  $"{(int)(timeAgo.TotalDays / 7)} week(s) ago";
+                                <span title="@user.LastLoginTime.Value.ToString("F")" data-bs-toggle="tooltip">
+                                    @timeAgoText
+                                </span>
+                            }
+                            else
+                            {
+                                <span class="text-muted">Never</span>
+                            }
+                        </td>
+                    </tr>
+                }
+            }
+        </tbody>
+    </table>
+</div>
+
+<p class="text-muted small">
+    <i class="bi bi-info-circle me-1"></i>
+    Total: @Model.Count user(s). Select users and use the toolbar to perform actions.
+</p>
+
+@section Scripts {
+<script>
+    // IMPORTANT: Initialize all functionality when DOM is ready
+    document.addEventListener('DOMContentLoaded', function() {
+        // NOTE: Initialize Bootstrap tooltips
+        var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+        tooltipTriggerList.map(function (tooltipTriggerEl) {
+            return new bootstrap.Tooltip(tooltipTriggerEl);
+        });
+        
+        // NOTE: Select all checkbox functionality
+        var selectAllCheckbox = document.getElementById('selectAll');
+        if (selectAllCheckbox) {
+            selectAllCheckbox.addEventListener('change', function() {
+                var checkboxes = document.querySelectorAll('.user-checkbox');
+                checkboxes.forEach(function(cb) {
+                    cb.checked = this.checked;
+                }.bind(this));
+            });
+        }
+        
+        // NOTA BENE: Update "select all" when individual checkboxes change
+        document.querySelectorAll('.user-checkbox').forEach(function(cb) {
+            cb.addEventListener('change', function() {
+                var total = document.querySelectorAll('.user-checkbox').length;
+                var checked = document.querySelectorAll('.user-checkbox:checked').length;
+                var selectAll = document.getElementById('selectAll');
+                if (selectAll) {
+                    selectAll.checked = (total > 0 && total === checked);
+                    selectAll.indeterminate = (checked > 0 && checked < total);
+                }
+            });
+        });
+        
+        // IMPORTANT: Get selected user IDs
+        function getSelectedIds() {
+            var selected = [];
+            document.querySelectorAll('.user-checkbox:checked').forEach(function(cb) {
+                selected.push(cb.value);
+            });
+            return selected;
+        }
+        
+        // NOTE: Submit form with selected IDs
+        function submitAction(formId) {
+            var ids = getSelectedIds();
+            if (ids.length === 0) {
+                // NOTA BENE: Show warning if no users selected
+                var alertDiv = document.createElement('div');
+                alertDiv.className = 'alert alert-warning alert-dismissible fade show';
+                alertDiv.innerHTML = '<i class="bi bi-exclamation-triangle me-2"></i>Please select at least one user.' +
+                    '<button type="button" class="btn-close" data-bs-dismiss="alert"></button>';
+                var toolbar = document.querySelector('.btn-toolbar');
+                if (toolbar) {
+                    toolbar.before(alertDiv);
+                }
+                return;
+            }
+            
+            var form = document.getElementById(formId);
+            if (!form) {
+                console.error('Form not found: ' + formId);
+                return;
+            }
+            
+            // Clear previous hidden inputs
+            form.querySelectorAll('input[name="selectedIds"]').forEach(function(el) {
+                el.remove();
+            });
+            
+            // Add selected IDs as hidden inputs
+            ids.forEach(function(id) {
+                var input = document.createElement('input');
+                input.type = 'hidden';
+                input.name = 'selectedIds';
+                input.value = id;
+                form.appendChild(input);
+            });
+            
+            form.submit();
+        }
+        
+        // IMPORTANT: Bind toolbar buttons to actions
+        var blockBtn = document.getElementById('blockBtn');
+        if (blockBtn) {
+            blockBtn.addEventListener('click', function() {
+                submitAction('blockForm');
+            });
+        }
+        
+        var unblockBtn = document.getElementById('unblockBtn');
+        if (unblockBtn) {
+            unblockBtn.addEventListener('click', function() {
+                submitAction('unblockForm');
+            });
+        }
+        
+        var deleteBtn = document.getElementById('deleteBtn');
+        if (deleteBtn) {
+            deleteBtn.addEventListener('click', function() {
+                submitAction('deleteForm');
+            });
+        }
+        
+        var deleteUnverifiedBtn = document.getElementById('deleteUnverifiedBtn');
+        if (deleteUnverifiedBtn) {
+            deleteUnverifiedBtn.addEventListener('click', function() {
+                // IMPORTANT: Delete unverified doesn't require selection - submits form directly
+                var form = document.getElementById('deleteUnverifiedForm');
+                if (form) {
+                    form.submit();
+                }
+            });
+        }
+    });
+</script>
+}
+
+
