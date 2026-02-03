@@ -27,7 +27,11 @@ if (connectionString.StartsWith("postgresql://", StringComparison.OrdinalIgnoreC
     var username = Uri.UnescapeDataString(userInfo[0]);
     var password = userInfo.Length > 1 ? Uri.UnescapeDataString(userInfo[1]) : "";
     
-    finalConnectionString = $"Host={uri.Host};Port={uri.Port};Database={uri.LocalPath.TrimStart('/')};Username={username};Password={password}";
+    // NOTE: Use default PostgreSQL port (5432) if port is not specified in URL
+    var port = uri.Port != -1 ? uri.Port : 5432;
+    var database = uri.LocalPath.TrimStart('/');
+    
+    finalConnectionString = $"Host={uri.Host};Port={port};Database={database};Username={username};Password={password}";
     
     // NOTE: Add SSL mode for Render (required for production databases)
     if (!finalConnectionString.Contains("SslMode"))
