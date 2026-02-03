@@ -15,8 +15,29 @@ var builder = WebApplication.CreateBuilder(args);
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection") 
     ?? throw new InvalidOperationException("Connection string 'DefaultConnection' not found.");
 
+// NOTE: Convert Render PostgreSQL URL format to standard Npgsql format (if needed)
+// NOTA BENE: This allows both local format (Host=...;Port=...) and Render URL format (postgresql://...)
+var finalConnectionString = connectionString;
+if (connectionString.StartsWith("postgresql://", StringComparison.OrdinalIgnoreCase) ||
+    connectionString.StartsWith("postgres://", StringComparison.OrdinalIgnoreCase))
+{
+    // IMPORTANT: Parse PostgreSQL URL format (postgresql://user:pass@host:port/db)
+    var uri = new Uri(connectionString);
+    var userInfo = uri.UserInfo.Split(':');
+    var username = Uri.UnescapeDataString(userInfo[0]);
+    var password = userInfo.Length > 1 ? Uri.UnescapeDataString(userInfo[1]) : "";
+    
+    finalConnectionString = $"Host={uri.Host};Port={uri.Port};Database={uri.LocalPath.TrimStart('/')};Username={username};Password={password}";
+    
+    // NOTE: Add SSL mode for Render (required for production databases)
+    if (!finalConnectionString.Contains("SslMode"))
+    {
+        finalConnectionString += ";SslMode=Require";
+    }
+}
+
 builder.Services.AddDbContext<AppDbContext>(options =>
-    options.UseNpgsql(connectionString));
+    options.UseNpgsql(finalConnectionString));
 
 // IMPORTANT: Configure cookie authentication
 builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
