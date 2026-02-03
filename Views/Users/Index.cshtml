@@ -9,23 +9,30 @@
 
 <!-- IMPORTANT: Toolbar with action buttons -->
 <!-- NOTE: Toolbar is always visible, buttons disabled when no selection -->
-<div class="btn-toolbar mb-3" role="toolbar" aria-label="User actions toolbar">
-    <button type="button" class="btn btn-warning me-2" id="blockBtn" 
-            title="Block selected users" data-bs-toggle="tooltip">
-        <i class="bi bi-lock-fill me-1"></i>Block
-    </button>
-    <button type="button" class="btn btn-outline-success me-2" id="unblockBtn" 
-            title="Unblock selected users" data-bs-toggle="tooltip">
-        <i class="bi bi-unlock-fill"></i>
-    </button>
-    <button type="button" class="btn btn-outline-danger me-2" id="deleteBtn" 
-            title="Delete selected users" data-bs-toggle="tooltip">
-        <i class="bi bi-trash-fill"></i>
-    </button>
-    <button type="button" class="btn btn-outline-danger" id="deleteUnverifiedBtn" 
-            title="Delete unverified users" data-bs-toggle="tooltip">
-        <i class="bi bi-eraser-fill"></i>
-    </button>
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <div class="btn-toolbar" role="toolbar" aria-label="User actions toolbar">
+        <button type="button" class="btn btn-warning me-2" id="blockBtn" 
+                title="Block selected users" data-bs-toggle="tooltip">
+            <i class="bi bi-lock-fill me-1"></i>Block
+        </button>
+        <button type="button" class="btn btn-outline-success me-2" id="unblockBtn" 
+                title="Unblock selected users" data-bs-toggle="tooltip">
+            <i class="bi bi-unlock-fill"></i>
+        </button>
+        <button type="button" class="btn btn-outline-danger me-2" id="deleteBtn" 
+                title="Delete selected users" data-bs-toggle="tooltip">
+            <i class="bi bi-trash-fill"></i>
+        </button>
+        <button type="button" class="btn btn-outline-danger" id="deleteUnverifiedBtn" 
+                title="Delete unverified users" data-bs-toggle="tooltip">
+            <i class="bi bi-eraser-fill"></i>
+        </button>
+    </div>
+    <!-- NOTE: Filter input on the right side of toolbar -->
+    <div class="ms-auto">
+        <input type="text" id="filterInput" class="form-control" placeholder="Filter" 
+               style="width: 200px;" />
+    </div>
 </div>
 
 <!-- IMPORTANT: Hidden forms for each action -->
@@ -83,7 +90,7 @@
                     </a>
                 </th>
                 <th>
-                    <a href="?sortBy=LastSeen&sortOrder=@(ViewBag.SortBy == "LastSeen" && ViewBag.SortOrder == "asc" ? "desc" : "asc")" 
+                    <a href="?sortBy=LastSeen&sortOrder=@((ViewBag.SortBy == "LastSeen" || ViewBag.SortBy == null) && (ViewBag.SortOrder == "desc" || ViewBag.SortOrder == null) ? "asc" : "desc")" 
                        class="text-decoration-none text-dark">
                         Last seen
                         @if (ViewBag.SortBy == "LastSeen" || ViewBag.SortBy == null)
@@ -109,16 +116,16 @@
                 {
                     // IMPORTANT: Check if user is blocked for styling
                     var isBlocked = user.Status == UserStatus.Blocked;
-                    var rowClass = isBlocked ? "text-muted" : "";
                     var textDecoration = isBlocked ? "text-decoration-line-through" : "";
+                    var textColor = isBlocked ? "text-muted" : "";
                     
-                    <tr class="@rowClass">
+                    <tr data-user-name="@user.Name.ToLower()" data-user-email="@user.Email.ToLower()">
                         <td class="text-center">
                             <input type="checkbox" class="form-check-input user-checkbox" 
                                    value="@user.Id" />
                         </td>
-                        <td class="@textDecoration">@user.Name</td>
-                        <td>@user.Email</td>
+                        <td class="@textColor @textDecoration">@user.Name</td>
+                        <td class="@textColor">@user.Email</td>
                         <td>
                             @{
                                 var badgeClass = user.Status switch
@@ -130,7 +137,7 @@
                             }
                             <span class="badge @badgeClass">@user.Status</span>
                         </td>
-                        <td>
+                        <td class="@textColor">
                             @if (user.LastLoginTime.HasValue)
                             {
                                 var timeAgo = DateTime.UtcNow - user.LastLoginTime.Value;
@@ -145,7 +152,7 @@
                             }
                             else
                             {
-                                <span class="text-muted">Never</span>
+                                <span>Never</span>
                             }
                         </td>
                     </tr>
@@ -271,6 +278,48 @@
                 var form = document.getElementById('deleteUnverifiedForm');
                 if (form) {
                     form.submit();
+                }
+            });
+        }
+        
+        // IMPORTANT: Real-time filter functionality (client-side)
+        // NOTE: Filters table rows instantly without page reload
+        var filterInput = document.getElementById('filterInput');
+        if (filterInput) {
+            filterInput.addEventListener('input', function() {
+                var filterValue = this.value.toLowerCase().trim();
+                var rows = document.querySelectorAll('tbody tr[data-user-name]');
+                var visibleCount = 0;
+                
+                rows.forEach(function(row) {
+                    var userName = row.getAttribute('data-user-name') || '';
+                    var userEmail = row.getAttribute('data-user-email') || '';
+                    
+                    // NOTE: Show row if filter matches name or email
+                    if (filterValue === '' || 
+                        userName.includes(filterValue) || 
+                        userEmail.includes(filterValue)) {
+                        row.style.display = '';
+                        visibleCount++;
+                    } else {
+                        row.style.display = 'none';
+                    }
+                });
+                
+                // NOTA BENE: Update total count message
+                var totalText = document.querySelector('.text-muted.small');
+                if (totalText && filterValue !== '') {
+                    var originalText = totalText.textContent.match(/Total: (\d+)/);
+                    if (originalText) {
+                        totalText.innerHTML = '<i class="bi bi-info-circle me-1"></i>' +
+                            'Showing ' + visibleCount + ' of ' + originalText[1] + ' user(s).';
+                    }
+                } else if (totalText) {
+                    var originalText = totalText.textContent.match(/(\d+)/);
+                    if (originalText) {
+                        totalText.innerHTML = '<i class="bi bi-info-circle me-1"></i>' +
+                            'Total: ' + originalText[1] + ' user(s). Select users and use the toolbar to perform actions.';
+                    }
                 }
             });
         }

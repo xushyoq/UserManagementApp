@@ -114,3 +114,4 @@
 /home/xush/Projects/Itransition/task4/obj/Debug/net8.0/UserManagement.pdb
 /home/xush/Projects/Itransition/task4/obj/Debug/net8.0/UserManagement.genruntimeconfig.cache
 /home/xush/Projects/Itransition/task4/obj/Debug/net8.0/ref/UserManagement.dll
+/home/xush/Projects/Itransition/task4/obj/Debug/net8.0/UserManagement.sourcelink.json

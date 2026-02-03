@@ -36,6 +36,7 @@ public class UsersController : Controller
         var query = _db.Users.AsQueryable();
         
         // IMPORTANT: Apply sorting based on column and order
+        // NOTE: Filtering is done client-side for real-time performance
         query = (sortBy?.ToLower(), sortOrder?.ToLower()) switch
         {
             ("name", "asc") => query.OrderBy(u => u.Name),
