@@ -60,6 +60,9 @@ builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationSc
         options.SlidingExpiration = true;
     });
 
+// NOTE: Register HttpClientFactory for email service
+builder.Services.AddHttpClient();
+
 // NOTE: Register email service
 builder.Services.AddScoped<IEmailService, EmailService>();
 

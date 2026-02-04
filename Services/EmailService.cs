@@ -1,27 +1,28 @@
-using MailKit.Net.Smtp;
-using MailKit.Security;
-using MimeKit;
+using System.Net.Http.Json;
+using System.Text.Json;
 
 namespace UserManagement.Services;
 
 /// <summary>
-/// IMPORTANT: Email service implementation using MailKit.
-/// NOTE: Uses SMTP (Gmail or other provider) to send emails.
-/// NOTA BENE: Configuration comes from appsettings.json.
+/// IMPORTANT: Email service implementation using Resend API.
+/// NOTE: Uses Resend REST API instead of SMTP (works on Render which blocks SMTP ports).
+/// NOTA BENE: Configuration comes from appsettings.json or Environment Variables.
 /// </summary>
 public class EmailService : IEmailService
 {
     private readonly IConfiguration _config;
     private readonly ILogger<EmailService> _logger;
+    private readonly HttpClient _httpClient;
     
-    public EmailService(IConfiguration config, ILogger<EmailService> logger)
+    public EmailService(IConfiguration config, ILogger<EmailService> logger, IHttpClientFactory httpClientFactory)
     {
         _config = config;
         _logger = logger;
+        _httpClient = httpClientFactory.CreateClient();
     }
     
     /// <summary>
-    /// IMPORTANT: Sends confirmation email asynchronously.
+    /// IMPORTANT: Sends confirmation email asynchronously via Resend API.
     /// NOTE: Uses fire-and-forget pattern to not block registration.
     /// NOTA BENE: Logs errors but doesn't throw to avoid breaking registration.
     /// </summary>
@@ -29,50 +30,51 @@ public class EmailService : IEmailService
     {
         try
         {
-            // NOTE: Get SMTP configuration
-            var smtpHost = _config["Email:SmtpHost"] ?? "smtp.gmail.com";
-            var smtpPort = int.Parse(_config["Email:SmtpPort"] ?? "587");
-            var smtpUser = _config["Email:SmtpUser"];
-            var smtpPass = _config["Email:SmtpPass"];
-            var fromName = _config["Email:FromName"] ?? "User Management App";
-            
-            // NOTA BENE: If email is not configured, log and skip
-            if (string.IsNullOrEmpty(smtpUser) || string.IsNullOrEmpty(smtpPass))
+            // NOTE: Get Resend API configuration
+            var apiKey = _config["Email:ResendApiKey"];
+            if (string.IsNullOrEmpty(apiKey))
             {
-                _logger.LogWarning("Email not configured. Confirmation link: {Link}", confirmLink);
+                _logger.LogWarning("Resend API key not configured. Confirmation link: {Link}", confirmLink);
                 return;
             }
             
-            // IMPORTANT: Create email message
-            var message = new MimeMessage();
-            message.From.Add(new MailboxAddress(fromName, smtpUser));
-            message.To.Add(new MailboxAddress(userName, toEmail));
-            message.Subject = "Confirm your email";
+            var fromEmail = _config["Email:FromEmail"] ?? "onboarding@resend.dev";
+            var fromName = _config["Email:FromName"] ?? "User Management App";
             
-            // NOTE: Create email body
-            var bodyBuilder = new BodyBuilder
+            // IMPORTANT: Prepare Resend API request
+            _httpClient.DefaultRequestHeaders.Clear();
+            _httpClient.DefaultRequestHeaders.Add("Authorization", $"Bearer {apiKey}");
+            
+            var requestBody = new
             {
-                TextBody = $@"Hello, {userName}!
-
-Thank you for registering. Please confirm your email by clicking the link below:
-
-{confirmLink}
-
-If you didn't register, please ignore this email.
-
-Best regards,
-User Management App"
+                from = $"{fromName} <{fromEmail}>",
+                to = new[] { toEmail },
+                subject = "Confirm your email",
+                html = $@"<p>Hello, {userName}!</p>
+                    <p>Thank you for registering. Please confirm your email by clicking the link below:</p>
+                    <p><a href=""{confirmLink}"">{confirmLink}</a></p>
+                    <p>If you didn't register, please ignore this email.</p>
+                    <p>Best regards,<br/>User Management App</p>"
             };
-            message.Body = bodyBuilder.ToMessageBody();
             
-            // IMPORTANT: Send email via SMTP
-            using var client = new SmtpClient();
-            await client.ConnectAsync(smtpHost, smtpPort, SecureSocketOptions.StartTls);
-            await client.AuthenticateAsync(smtpUser, smtpPass);
-            await client.SendAsync(message);
-            await client.DisconnectAsync(true);
+            // NOTE: Send email via Resend API
+            var response = await _httpClient.PostAsJsonAsync(
+                "https://api.resend.com/emails", 
+                requestBody);
             
-            _logger.LogInformation("Confirmation email sent to {Email}", toEmail);
+            if (response.IsSuccessStatusCode)
+            {
+                var result = await response.Content.ReadFromJsonAsync<JsonElement>();
+                var emailId = result.GetProperty("id").GetString();
+                _logger.LogInformation("Confirmation email sent to {Email} via Resend. Email ID: {Id}", 
+                    toEmail, emailId);
+            }
+            else
+            {
+                var errorContent = await response.Content.ReadAsStringAsync();
+                _logger.LogError("Resend API error: {StatusCode} - {Error}", 
+                    response.StatusCode, errorContent);
+            }
         }
         catch (Exception ex)
         {
