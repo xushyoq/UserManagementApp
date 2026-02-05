@@ -94,7 +94,8 @@ public class UsersController : Controller
     
     /// <summary>
     /// IMPORTANT: Unblock selected users.
-    /// NOTE: Changes status to Active for all selected user IDs.
+    /// NOTE: Restores user to their previous status based on email confirmation.
+    /// NOTA BENE: If email was confirmed (token is null) → Active, otherwise → Unverified.
     /// </summary>
     [HttpPost]
     [ValidateAntiForgeryToken]
@@ -110,18 +111,36 @@ public class UsersController : Controller
             .Where(u => selectedIds.Contains(u.Id))
             .ToListAsync();
         
+        int unblockedCount = 0;
         foreach (var user in users)
         {
-            // NOTE: Set to Active (not Unverified) when unblocking
-            user.Status = UserStatus.Active;
+            // IMPORTANT: Only unblock Blocked users
+            if (user.Status == UserStatus.Blocked)
+            {
+                // NOTE: Restore to previous status based on email confirmation
+                // If email was confirmed (token is null) → Active
+                // If email was not confirmed (token exists) → Unverified
+                user.Status = user.EmailConfirmationToken == null 
+                    ? UserStatus.Active 
+                    : UserStatus.Unverified;
+                unblockedCount++;
+            }
         }
         
         await _db.SaveChangesAsync();
         
         _logger.LogInformation("Unblocked {Count} users: {Ids}", 
-            users.Count, string.Join(", ", selectedIds));
+            unblockedCount, string.Join(", ", selectedIds));
         
-        TempData["Success"] = $"Successfully unblocked {users.Count} user(s).";
+        if (unblockedCount == 0)
+        {
+            TempData["Warning"] = "No blocked users were selected to unblock.";
+        }
+        else
+        {
+            TempData["Success"] = $"Successfully unblocked {unblockedCount} user(s).";
+        }
+        
         return RedirectToAction("Index");
     }
     
