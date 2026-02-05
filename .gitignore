@@ -1,0 +1,73 @@
+## .NET Core / ASP.NET Core
+bin/
+obj/
+*.user
+*.suo
+*.cache
+*.dll
+*.pdb
+*.exe
+*.log
+
+## Build results
+[Dd]ebug/
+[Rr]elease/
+x64/
+x86/
+[Aa][Rr][Mm]/
+[Aa][Rr][Mm]64/
+bld/
+[Bb]in/
+[Oo]bj/
+[Ll]og/
+
+## Visual Studio
+.vs/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+## Rider
+.idea/
+*.sln.iml
+
+## VS Code
+.vscode/
+
+## Sensitive configuration files - IMPORTANT: Never commit these!
+appsettings.json
+appsettings.*.json
+!appsettings.example.json
+appsettings.Development.json
+appsettings.Production.json
+
+## Environment files
+.env
+.env.local
+.env.*.local
+
+## Database
+*.db
+*.sqlite
+*.sqlite3
+
+## Logs
+logs/
+*.log
+npm-debug.log*
+
+## OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+## Temporary files
+*.tmp
+*.temp
+*.swp
+*~
+
+## PDF files (if task description is sensitive)
+# Task_4.pdf
+
